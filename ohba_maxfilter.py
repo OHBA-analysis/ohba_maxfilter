@@ -117,7 +117,7 @@ def run_maxfilter(infif, outfif, args, logfile_tag=''):
 
     # Set tee to capture both stdout and stderr into separate files
     # https://stackoverflow.com/a/692407
-    cmd += '> >(tee -a {stdlog}) 2> >(tee -a {errlog} >&2)'.format(stdlog=stdlog, errlog=errlog)
+    cmd += ' -v > >(tee -a {stdlog}) 2> >(tee -a {errlog} >&2)'.format(stdlog=stdlog, errlog=errlog)
 
     # --------------
     # Run Maxfilter
