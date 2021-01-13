@@ -243,7 +243,7 @@ parser.add_argument('--trans', type=str, default=None,
 
 parser.add_argument('--tsss', action='store_true',
                     help='Apply temporal extension of maxfilter')
-parser.add_argument('--st', type=float, default=2,
+parser.add_argument('--st', type=float, default=10,
                     help='Data buffer length for TSSS processing')
 parser.add_argument('--corr', type=float, default=0.98,
                     help='Subspace correlation limit for TSSS processing')
