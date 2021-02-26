@@ -3,7 +3,9 @@ import sys
 import argparse
 import subprocess
 
+
 def _add_headpos(cmd, args):
+    """stimates and stores head position parameters but does not transform data"""
     if ('headpos' in args) and args['headpos']:
         hp_name = outname.replace('.fif','_headpos.log')
         hp_name = os.path.join(args['outdir'], hp_name)
@@ -11,13 +13,33 @@ def _add_headpos(cmd, args):
     return cmd
 
 def _add_movecomp(cmd, args):
+    """estimates head movements and transforms data to reference head position in continuous raw data"""
     # Add option for Automatic head-movement compensation
     if ('movecomp' in args) and args['movecomp']:
         cmd += ' -movecomp'
     return cmd
 
+def _add_movecompinter(cmd, args):
+    """estimates head movements and transforms data to reference head position in continuous raw data"""
+    # Add option for Automatic head-movement compensation
+    if ('movecompinter' in args) and args['movecompinter']:
+        cmd += ' -movecomp inter'
+    return cmd
+
+def _add_hpie(cmd, args):
+    """sets the error limit for hpi coil fitting (def 5 mm)"""
+    if ('hpie' in args) and (args['hpie'] is not None):
+        cmd += ' -hpie {0}'.format(args['hpie'])
+    return cmd
+
+def _add_hpig(cmd, args):
+    """sets the g-value limit for hpi coil fitting (def 0.98)"""
+    if ('hpig' in args) and (args['hpig'] is not None):
+        cmd += ' -hpig {0}'.format(args['hpig'])
+    return cmd
+
 def _add_autobad(cmd, args):
-    # Add option for Automatic bad channel detection
+    """sets automated bad channel detection on: scan the whole raw data file, off: no autobad"""
     if ('autobad' in args) and args['autobad']:
         cmd += ' -autobad on'
     else:
@@ -25,37 +47,44 @@ def _add_autobad(cmd, args):
     return cmd
 
 def _add_bad(cmd, args):
+    """sets the list of static bad channels (logical chnos, e.g.: 0323 1042 2631)"""
     if ('bads' in args) and args['bads'] is not None:
         cmd += ' -bad {0}'.format(args['bads'])
     return cmd
 
 def _add_tsss(cmd, args):
+    """Add all tsss related args"""
     # Add option for Temporal Extension of maxfilter
     if ('tsss' in args) and args['tsss']:
         cmd += ' -st {0} -corr {1}'.format(args['st'], args['corr'])
     return cmd
 
 def _add_trans(cmd, args):
+    """transforms the data into head position in <fiff_file>"""
     if ('trans' in args) and args['trans'] is not None:
         cmd += ' -trans {0} -force'.format(args['trans'])
     return cmd
 
 def _add_inorder(cmd, args):
+    """sets the order of the inside expansion"""
     if ('inorder' in args) and args['inorder'] is not None:
         cmd += ' -in {0}'.format(args['inorder'])
     return cmd
 
 def _add_outorder(cmd, args):
+    """sets the order of the outside expansion"""
     if ('outorder' in args) and args['outorder'] is not None:
         cmd += ' -out {0}'.format(args['outorder'])
     return cmd
 
 def _add_ctc(cmd, args):
+    """uses the cross-talk matrix in <ctcfile>"""
     if ('ctc' in args) and args['ctc']:
         cmd += ' -ctc {0}'.format(args['ctc'])
     return cmd
 
 def _add_cal(cmd, args):
+    """uses the fine-calibration in <calfile>"""
     if ('cal' in args) and args['cal']:
         cmd += ' -cal {0}'.format(args['cal'])
     return cmd
@@ -82,7 +111,13 @@ def _add_scanner(cmd, args):
 
 def run_maxfilter(infif, outfif, args, logfile_tag=''):
 
-    basecmd = '/neuro/bin/util/maxfilter-2.2 -f {infif} -o {outfif}'
+    #print(args)
+    #if ('maxpath' in args) and ('maxpath' is not None):
+    #    maxpath = args['maxpath']
+    #else:
+    #    maxpath = '/neuro/bin/util/maxfilter-2.2'
+
+    basecmd = '{maxpath} -f {infif} -o {outfif}'
 
     # --------------
     # Format Maxfilter options
@@ -93,10 +128,13 @@ def run_maxfilter(infif, outfif, args, logfile_tag=''):
         outfif = outfif.replace('.fif','sss.fif')
 
     # Create base command
-    cmd = basecmd.format(infif=fif, outfif=outfif)
+    cmd = basecmd.format(maxpath=args['maxpath'], infif=fif, outfif=outfif)
 
     cmd = _add_headpos(cmd, args)
     cmd = _add_movecomp(cmd, args)
+    cmd = _add_movecompinter(cmd, args)
+    cmd = _add_hpie(cmd, args)
+    cmd = _add_hpig(cmd, args)
     cmd = _add_autobad(cmd, args)
     cmd = _add_bad(cmd, args)
     cmd = _add_tsss(cmd, args)
@@ -158,7 +196,7 @@ def run_multistage_maxfilter(infif, outbase, args):
     # Fixed Args
     stage1_args = {'autobad': True}
     # User args
-    for key in ['inorder', 'outorder',
+    for key in ['inorder', 'outorder', 'hpie', 'hpig', 'maxpath',
                 'scanner', 'ctc', 'cal', 'dryrun', 'overwrite', 'outdir']:
         if key in args:
             stage1_args[key] = args[key]
@@ -192,9 +230,9 @@ def run_multistage_maxfilter(infif, outbase, args):
     # Fixed Args
     stage2_args = {'autobad': None, 'bads': bads}
     # User args
-    for key in ['tsss', 'st', 'corr' , 'inorder', 'outorder',
-                'scanner', 'ctc', 'cal', 'dryrun','overwrite',
-                'movecomp', 'headpos', 'outdir']:
+    for key in ['tsss', 'st', 'corr' , 'inorder', 'outorder', 'maxpath',
+                'scanner', 'ctc', 'cal', 'dryrun','overwrite', 'hpig', 'hpie',
+                'movecomp', 'movecompinter', 'headpos', 'outdir']:
         if key in args:
             stage2_args[key] = args[key]
 
@@ -229,6 +267,9 @@ parser.add_argument('files', type=str,
 parser.add_argument('outdir', type=str,
                     help='Path to output directory to save data in')
 
+parser.add_argument('--maxpath', type=str, default='/neuro/bin/util/maxfilter-2.2',
+                     help='Path to maxfilter command to use')
+
 parser.add_argument('--mode', type=str, default='standard',
                     help="Running mode for maxfilter. Either 'standard' or 'multistage'")
 
@@ -236,6 +277,8 @@ parser.add_argument('--headpos', action='store_true',
                     help='Output additional head movement parameter file')
 parser.add_argument('--movecomp', action='store_true',
                     help='Apply movement compensation')
+parser.add_argument('--movecompinter', action='store_true',
+                    help='Apply movement compensation on data with intermittent HPI')
 parser.add_argument('--autobad', action='store_true',
                     help='Apply automatic bad channel detection')
 parser.add_argument('--trans', type=str, default=None,
@@ -252,6 +295,11 @@ parser.add_argument('--inorder', type=int, default=None,
                     help='Set the order of the inside expansion')
 parser.add_argument('--outorder', type=int, default=None,
                     help='Set the order of the outside expansion')
+
+parser.add_argument('--hpie', type=int, default=None,
+                    help="sets the error limit for hpi coil fitting (def 5 mm)")
+parser.add_argument('--hpig', type=float, default=None,
+                    help="ets the g-value limit (goodness-of-fit) for hpi coil fitting (def 0.98))")
 
 parser.add_argument('--scanner', type=str, default=None,
                     help="Set CTC and Cal for the OHBA scanner the dataset was collected with (VectorView, VectorView2 or Neo). This overrides the --ctc and --cal options.")
