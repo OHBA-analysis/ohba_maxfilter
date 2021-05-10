@@ -2,6 +2,13 @@
 
 A python batch processing script for Maxfilter preprocessing of MEG files.
 
+- [Dependencies](#dependencies)
+- [Install](#install)
+- [Usage](#usage)
+  - [Customising Options](#customising-options)
+  - [Multistage Options](#multistage-options)
+- [Options Arguments](#optional-arguments)
+
 ## Dependencies
 
 OHBA Maxfilter mostly runs using standard python libraries. MNE-Python is required to run the `cbu` mode.
@@ -45,12 +52,41 @@ python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --autobad --mov
 Some options take additional arguments. Here we specify that temporal extension SSS should be applied with a 20 second data buffer (using `--tsss` and `-st 20`) and that two specific channels should be removed from the analysis (`--bads 1722 1723`).
 
 ```
-python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --movecomp --headpos --tsss -st 20 -bads 1722 1723
+python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --movecomp --headpos --tsss --st 20 --bads 1722 1723
 ```
 
-A complete list of customisation options is included below.
+A [complete list of customisation options](#optional-arguments) is included at the bottom of this page.
 
-### Multistage operations
+#### Temporal Extension
+
+The temporal extension can be turned on with the `--tsss` flag, the buffer length and correlation threshold can then be cusomised using the `--st` and `--corr` options. This is slightly different to main maxfilter which only requires you to specify -st to turn on the temporal extension.
+
+This example specifys a temporal extension with a twenty second buffer window and a correlation threshold of 0.9
+
+```
+python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --movecomp --headpos --tsss --st 20 --corr 0.9
+```
+
+#### Position Translation
+
+There are several ways to customised head position translation to align head position between two recordings. One option is to align both scans to the same pre-specified position. This is done by specifying `--trans` to default and providing a head origin co-ordinate. For example:
+
+```
+python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --trans default --origin 0 0 40 --frame head --force
+```
+
+Will move the point 0,0,40 in head space to the device origin and then align the device and head coordinate systems.
+
+We can also align one scan to match the head position of a reference scan. This is done by specifying the path to a reference fif file in the `--trans` option. For example:
+
+```
+python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --trans /path/to/reference.fif
+```
+
+Will align all files with the head position from the `/path/to/reference.fif` file.
+
+
+### Multistage Options
 
 More complex maxfilter workflows are implemented as specific 'modes'. Two modes are implemented at the moment.
 
@@ -60,7 +96,7 @@ The multistage maxfilter is selected using `--mode multistage`. This will first 
 
 1) Maxfilter with limited customisation, no movement compensation and autobad on to identify bad channels. 
 2) Maxfilter with full customisation and movement compensation with the specific bad channels from stage 1
-3) Options trans def stage to default position or to a reference fif (requires that `-trans` be defined)
+3) Optional [position translation](#position-translation) (this requires that the `--trans` options are specified)
 
 #### CBU
 
@@ -69,7 +105,7 @@ The CBU maxfilter processing chain is selected using `--mode cbu`. This will fir
 1) A custom head-origin co-ordinate is estimated from the headshape points with any nose points removed.
 2) Maxfilter with limited customisation, no movement compensation and autobad on to identify bad channels. 
 3) Maxfilter with full customisation and movement compensation with the specific bad channels from stage 1
-4) Trans stage to default position or to a reference fif (requires that `-trans` be defined)
+4) Position translation to a default head position.
 
 ### Optional Arguments
 
