@@ -2,7 +2,7 @@
 
 A python batch processing script for Maxfilter preprocessing of MEG files.
 
-## Dependancies
+## Dependencies
 
 OHBA Maxfilter mostly runs using standard python libraries. MNE-Python is required to run the `cbu_3stage` mode.
 
@@ -27,6 +27,49 @@ python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/
 ```
 
 will run each fif file in `input_files.txt` through maxfilter with default options and store the outputs in `/path/to/my/output/dir/`
+
+### Customising Options
+
+Maxfilter processing can be customised using command line flags which are (mostly) mapped to the options in Maxfilter itself. For exmaple, we can specify that `autobad` be included by adding the `--autobad` command line flag.
+
+```
+python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --autobad
+```
+
+Similarly, we can include movement compensation and head-position computation by adding their respective options.
+
+```
+python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --autobad --movecomp --headpos
+```
+
+Some options take addition arguments. Here we specify that temporal extension SSS should be applied with a 20 second data buffer (using `--tsss` and `-st 20`) and that two specific channels should be removed from the analysis (`--bads 1722 1723`).
+
+```
+python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --movecomp --headpos --tsss -st 20 -bads 1722 1723
+```
+
+A complete list of customisation options is included below.
+
+### Multistage operations
+
+More complex maxfilter workflows are implemented as specific 'modes'. Two modes are implemented at the moment.
+
+#### Multistage
+
+The multistage maxfilter is selected using `--mode multistage`. This will first run:
+
+1) Maxfilter with limited customisation, no movement compensation and autobad on to identify bad channels. 
+2) Maxfilter with full customisation and movement compensation with the specific bad channels from stage 1
+3) Options trans def stage to default position or to a reference fif (requires that `-trans` be defined)
+
+#### CBU
+
+The CBU maxfilter processing chain is selected using `--mode cbu`. This will first run:
+
+1) A custom head-origin co-ordinate is estimated from the headshape points with any nose points removed.
+2) Maxfilter with limited customisation, no movement compensation and autobad on to identify bad channels. 
+3) Maxfilter with full customisation and movement compensation with the specific bad channels from stage 1
+4) Trans stage to default position or to a reference fif (requires that `-trans` be defined)
 
 ### Optional Arguments
 
