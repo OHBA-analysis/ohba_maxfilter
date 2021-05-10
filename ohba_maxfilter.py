@@ -1,30 +1,37 @@
 import os
 import sys
 import argparse
-import subprocess
+import tempfile
 
 
 def _add_headpos(cmd, args):
-    """stimates and stores head position parameters but does not transform data"""
+    """Estimates and stores head position parameters but does not transform data"""
     if ('headpos' in args) and args['headpos']:
-        hp_name = outname.replace('.fif','_headpos.log')
+        hp_name = outname.replace('.fif', '_headpos.log')
         hp_name = os.path.join(args['outdir'], hp_name)
         cmd += ' -hp {0}'.format(hp_name)
     return cmd
 
+
 def _add_movecomp(cmd, args):
-    """estimates head movements and transforms data to reference head position in continuous raw data"""
+    """Estimates head movements and transforms data.
+
+    Data are transformed to reference head position in continuous raw data"""
     # Add option for Automatic head-movement compensation
     if ('movecomp' in args) and args['movecomp']:
         cmd += ' -movecomp'
     return cmd
 
+
 def _add_movecompinter(cmd, args):
-    """estimates head movements and transforms data to reference head position in continuous raw data"""
+    """Estimates head movements and transforms data with intermittent HPI
+
+    Data are transformed to reference head position in continuous raw data"""
     # Add option for Automatic head-movement compensation
     if ('movecompinter' in args) and args['movecompinter']:
         cmd += ' -movecomp inter'
     return cmd
+
 
 def _add_hpie(cmd, args):
     """sets the error limit for hpi coil fitting (def 5 mm)"""
@@ -32,11 +39,21 @@ def _add_hpie(cmd, args):
         cmd += ' -hpie {0}'.format(args['hpie'])
     return cmd
 
+
 def _add_hpig(cmd, args):
     """sets the g-value limit for hpi coil fitting (def 0.98)"""
     if ('hpig' in args) and (args['hpig'] is not None):
         cmd += ' -hpig {0}'.format(args['hpig'])
     return cmd
+
+
+def _add_hpisubt(cmd, args):
+    """subtracts hpi signals: chpi sine amplitudes, amp + linefreq harmonics,
+     or switch off (def = amp)"""
+    if ('hpisubt' in args) and (args['hpisubt'] is not None):
+        cmd += ' -hpisubt {0}'.format(args['hpisubt'])
+    return cmd
+
 
 def _add_autobad(cmd, args):
     """sets automated bad channel detection on: scan the whole raw data file, off: no autobad"""
@@ -46,11 +63,34 @@ def _add_autobad(cmd, args):
         cmd += ' -autobad off'
     return cmd
 
+
+def _add_autobad_dur(cmd, args):
+    """sets automated bad channel detection on with specified duration."""
+    if ('autobad_dur' in args) and (args['autobad_dur'] is not None):
+        cmd += ' -autobad {0}'.format(args['autobad_dur'])
+    return cmd
+
+
+def _add_badlimit(cmd, args):
+    """Threshold for bad channel detection (>ave+X*SD)"""
+    if ('badlimit' in args) and (args['badlimit'] is not None):
+        cmd += ' -badlimit {0}'.format(args['badlimit'])
+    return cmd
+
+
 def _add_bad(cmd, args):
     """sets the list of static bad channels (logical chnos, e.g.: 0323 1042 2631)"""
     if ('bads' in args) and args['bads'] is not None:
         cmd += ' -bad {0}'.format(args['bads'])
     return cmd
+
+
+def _add_linefreq(cmd, args):
+    """sets the basic line interference frequency (50/60Hz)"""
+    if ('linefreq' in args) and args['linefreq'] is not None:
+        cmd += ' -linefreq {0}'.format(args['linefreq'])
+    return cmd
+
 
 def _add_tsss(cmd, args):
     """Add all tsss related args"""
@@ -59,11 +99,20 @@ def _add_tsss(cmd, args):
         cmd += ' -st {0} -corr {1}'.format(args['st'], args['corr'])
     return cmd
 
+
 def _add_trans(cmd, args):
     """transforms the data into head position in <fiff_file>"""
     if ('trans' in args) and args['trans'] is not None:
-        cmd += ' -trans {0} -force'.format(args['trans'])
+        cmd += ' -trans {0}'.format(args['trans'])
     return cmd
+
+
+def _add_force(cmd, args):
+    """Ignore program warnings...."""
+    if ('force' in args) and (args['force'] is not None):
+        cmd += ' -force'
+    return cmd
+
 
 def _add_inorder(cmd, args):
     """sets the order of the inside expansion"""
@@ -71,11 +120,13 @@ def _add_inorder(cmd, args):
         cmd += ' -in {0}'.format(args['inorder'])
     return cmd
 
+
 def _add_outorder(cmd, args):
     """sets the order of the outside expansion"""
     if ('outorder' in args) and args['outorder'] is not None:
         cmd += ' -out {0}'.format(args['outorder'])
     return cmd
+
 
 def _add_ctc(cmd, args):
     """uses the cross-talk matrix in <ctcfile>"""
@@ -83,11 +134,27 @@ def _add_ctc(cmd, args):
         cmd += ' -ctc {0}'.format(args['ctc'])
     return cmd
 
+
 def _add_cal(cmd, args):
     """uses the fine-calibration in <calfile>"""
     if ('cal' in args) and args['cal']:
         cmd += ' -cal {0}'.format(args['cal'])
     return cmd
+
+
+def _add_origin(cmd, args):
+    """set a custom sphere origin."""
+    if ('origin' in args) and (args['origin'] is not None):
+        cmd += ' -origin {0} {1} {2}'.format(*args['origin'])
+    return cmd
+
+
+def _add_frame(cmd, args):
+    """set origin frame."""
+    if ('frame' in args) and (args['frame'] is not None):
+        cmd += ' -frame {0}'.format(args['frame'])
+    return cmd
+
 
 def _add_scanner(cmd, args):
     if ('scanner' in args) is False:
@@ -109,13 +176,44 @@ def _add_scanner(cmd, args):
     return cmd
 
 
-def run_maxfilter(infif, outfif, args, logfile_tag=''):
+def fit_cbu_origin(infif, outbase=None, remove_nose=True):
+    if 'mne' not in sys.modules:
+        import mne
+    if 'np' not in sys.modules:
+        import numpy as np
+    raw = mne.io.read_raw_fif(infif)
 
-    #print(args)
-    #if ('maxpath' in args) and ('maxpath' is not None):
-    #    maxpath = args['maxpath']
-    #else:
-    #    maxpath = '/neuro/bin/util/maxfilter-2.2'
+    # Extract headshape points
+    headshape = []
+    for dp in raw.info['dig']:
+        if dp['kind']._name.find('EXTRA') > 0:
+            headshape.append(dp['r'])
+    headshape = np.vstack(headshape)
+
+    if remove_nose:
+        # Remove nosepoints
+        keeps = np.where(np.logical_and(headshape[:, 2] < 0, headshape[:, 1] > 0) is False)[0]
+        headshape = headshape[keeps, :]
+
+    # Save txt and fit origin
+    if outbase is None:
+        tmp_hs = tempfile.NamedTemporaryFile(prefix="CBU_MaxfilterOrigin_Headshapes").name
+        tmp_fit = tempfile.NamedTemporaryFile(prefix="CBU_MaxfilterOrigin_Fit").name
+    else:
+        tmp_hs = outbase.format('headshape.txt')
+        tmp_fit = outbase.format('headorigin_fit.txt')
+
+    np.savetxt(tmp_hs, headshape)
+
+    cmd = '/neuro/bin/util/fit_sphere_to_points {0} > {1}'.format(tmp_hs, tmp_fit)
+    os.system("bash -c '{}'".format(cmd))
+
+    new_origin = np.loadtxt(tmp_fit)
+
+    return new_origin[:3] * 1000
+
+
+def run_maxfilter(infif, outfif, args, logfile_tag=''):
 
     basecmd = '{maxpath} -f {infif} -o {outfif}'
 
@@ -123,9 +221,9 @@ def run_maxfilter(infif, outfif, args, logfile_tag=''):
     # Format Maxfilter options
 
     if ('tsss' in args) and args['tsss']:
-        outfif = outfif.replace('.fif','tsss.fif')
-    else:
-        outfif = outfif.replace('.fif','sss.fif')
+        outfif = outfif.replace('.fif', 'tsss.fif')
+    elif logfile_tag != '_trans':
+        outfif = outfif.replace('.fif', 'sss.fif')
 
     # Create base command
     cmd = basecmd.format(maxpath=args['maxpath'], infif=fif, outfif=outfif)
@@ -135,9 +233,16 @@ def run_maxfilter(infif, outfif, args, logfile_tag=''):
     cmd = _add_movecompinter(cmd, args)
     cmd = _add_hpie(cmd, args)
     cmd = _add_hpig(cmd, args)
+    cmd = _add_hpisubt(cmd, args)
+    cmd = _add_linefreq(cmd, args)
     cmd = _add_autobad(cmd, args)
+    cmd = _add_autobad_dur(cmd, args)
     cmd = _add_bad(cmd, args)
+    cmd = _add_badlimit(cmd, args)
+    cmd = _add_force(cmd, args)
     cmd = _add_tsss(cmd, args)
+    cmd = _add_origin(cmd, args)
+    cmd = _add_frame(cmd, args)
     cmd = _add_trans(cmd, args)
     cmd = _add_inorder(cmd, args)
     cmd = _add_outorder(cmd, args)
@@ -148,9 +253,9 @@ def run_maxfilter(infif, outfif, args, logfile_tag=''):
         cmd = _add_cal(cmd, args)
 
     # Add verbose and logfile
-    stdlog = outname.replace('.fif','{0}.log'.format(logfile_tag))
+    stdlog = outname.replace('.fif', '{0}.log'.format(logfile_tag))
     stdlog = os.path.join(args['outdir'], stdlog)
-    errlog = outname.replace('.fif','{0}_err.log'.format(logfile_tag))
+    errlog = outname.replace('.fif', '{0}_err.log'.format(logfile_tag))
     errlog = os.path.join(args['outdir'], errlog)
 
     # Set tee to capture both stdout and stderr into separate files
@@ -174,6 +279,7 @@ def run_maxfilter(infif, outfif, args, logfile_tag=''):
 
 # -------------------------------------------------
 
+
 def run_multistage_maxfilter(infif, outbase, args):
     """
     https://imaging.mrc-cbu.cam.ac.uk/meg/Maxfilter
@@ -196,7 +302,7 @@ def run_multistage_maxfilter(infif, outbase, args):
     # Fixed Args
     stage1_args = {'autobad': True}
     # User args
-    for key in ['inorder', 'outorder', 'hpie', 'hpig', 'maxpath',
+    for key in ['inorder', 'outorder', 'hpie', 'hpig', 'maxpath', 'origin', 'frame',
                 'scanner', 'ctc', 'cal', 'dryrun', 'overwrite', 'outdir']:
         if key in args:
             stage1_args[key] = args[key]
@@ -205,7 +311,7 @@ def run_multistage_maxfilter(infif, outbase, args):
 
     if args['dryrun'] is False:
         # Read in bad channels from logfile
-        with open(outlog,'r') as f:
+        with open(outlog, 'r') as f:
             txt = f.readlines()
 
         for ii in range(len(txt)):
@@ -230,8 +336,8 @@ def run_multistage_maxfilter(infif, outbase, args):
     # Fixed Args
     stage2_args = {'autobad': None, 'bads': bads}
     # User args
-    for key in ['tsss', 'st', 'corr' , 'inorder', 'outorder', 'maxpath',
-                'scanner', 'ctc', 'cal', 'dryrun','overwrite', 'hpig', 'hpie',
+    for key in ['tsss', 'st', 'corr', 'inorder', 'outorder', 'maxpath', 'origin', 'frame',
+                'scanner', 'ctc', 'cal', 'dryrun', 'overwrite', 'hpig', 'hpie',
                 'movecomp', 'movecompinter', 'headpos', 'outdir']:
         if key in args:
             stage2_args[key] = args[key]
@@ -252,11 +358,98 @@ def run_multistage_maxfilter(infif, outbase, args):
         # Fixed Args
         stage3_args = {'autobad': None}
         # User args
-        for key in ['scanner','ctc','cal', 'dryrun','overwrite','trans','outdir']:
+        for key in ['maxpath', 'scanner', 'ctc', 'cal',
+                    'dryrun', 'overwrite', 'trans', 'outdir']:
             if key in args:
                 stage3_args[key] = args[key]
 
         outfif, outlog = run_maxfilter(infif, outfif, stage3_args, '_trans')
+
+
+def run_cbu_3stage_maxfilter(infif, outbase, args):
+
+    # --------------------------------------
+    # Stage 0 - Fit Origin without noce
+    origin = fit_cbu_origin(infif, outbase, remove_nose=True)
+
+    # --------------------------------------
+    # Stage 1 - Find Bad Channels
+
+    outfif = outbase.format('autobad_.fif')
+    outlog = outbase.format('autobad.log')
+
+    if os.path.exists(outfif):
+        os.remove(outfif)
+
+    # Fixed Args
+    stage1_args = {'autobad': True, 'origin': origin, 'frame': 'head',
+                   'autobad_dur': 1800, 'badlimit': 7,
+                   'linefreq': 50, 'hpisubt': 'amp'}
+    # User args
+    for key in ['inorder', 'outorder', 'hpie', 'hpig', 'maxpath',
+                'scanner', 'ctc', 'cal', 'dryrun', 'overwrite', 'outdir']:
+        if key in args:
+            stage1_args[key] = args[key]
+
+    outfif, outlog = run_maxfilter(infif, outfif, stage1_args, '_autobad')
+
+    if args['dryrun'] is False:
+        # Read in bad channels from logfile
+        with open(outlog, 'r') as f:
+            txt = f.readlines()
+
+        for ii in range(len(txt)):
+            if txt[ii][:19] == 'Static bad channels':
+                bads = txt[ii].split(': ')[1].split(' ')
+                bads = ' '.join([b.strip('\n') for b in bads])
+                break
+            else:
+                bads = None
+    else:
+        bads = None
+
+    # --------------------------------------
+    # Stage 2 - Signal Space Separation
+
+    outfif = outbase.format('.fif')
+    outlog = outbase.format('.log')
+
+    if os.path.exists(outfif):
+        os.remove(outfif)
+
+    # Fixed Args
+    stage2_args = {'autobad': None, 'bads': bads,
+                   'origin': origin, 'frame': 'head', 'movecompinter': True,
+                   'st': 10, 'corr': 0.98, 'tsss': True,
+                   'linefreq': 50, 'hpisubt': 'amp'}
+    # User args
+    for key in ['inorder', 'outorder', 'maxpath', 'scanner', 'ctc', 'cal',
+                'dryrun', 'overwrite', 'hpig', 'hpie', 'headpos', 'outdir']:
+        if key in args:
+            stage2_args[key] = args[key]
+
+    outfif, outlog = run_maxfilter(infif, outfif, stage2_args, '_tsss')
+
+    # --------------------------------------
+    # Stage 3 - Translate to default
+
+    infif = outfif  # input is output from previous stage
+    outfif = outbase.format('trans.fif')
+    outlog = outbase.format('trans.log')
+
+    if os.path.exists(outfif):
+        os.remove(outfif)
+
+    # Fixed Args
+    new_origin = [origin[0], origin[1] - 13, origin[2] + 6]
+    stage3_args = {'autobad': None, 'trans': 'default',
+                   'origin': list(new_origin), 'frame': 'head', 'force': True}
+    # User args
+    for key in ['maxpath', 'scanner', 'ctc', 'cal', 'dryrun', 'overwrite', 'outdir']:
+        if key in args:
+            stage3_args[key] = args[key]
+
+    outfif, outlog = run_maxfilter(infif, outfif, stage3_args, '_trans')
 
 
 # -------------------------------------------------
@@ -268,7 +461,8 @@ parser.add_argument('outdir', type=str,
                     help='Path to output directory to save data in')
 
 parser.add_argument('--maxpath', type=str, default='/neuro/bin/util/maxfilter-2.2',
-                     help='Path to maxfilter command to use')
+                    help='Path to maxfilter command to use')
+
 
 parser.add_argument('--mode', type=str, default='standard',
                     help="Running mode for maxfilter. Either 'standard' or 'multistage'")
@@ -281,8 +475,21 @@ parser.add_argument('--movecompinter', action='store_true',
                     help='Apply movement compensation on data with intermittent HPI')
 parser.add_argument('--autobad', action='store_true',
                     help='Apply automatic bad channel detection')
+parser.add_argument('--autobad_dur', type=int, default=None,
+                    help='Set autobad on with a specific duration')
+parser.add_argument('--bad', nargs='+',
+                    help='Set specific channels to bad')
+parser.add_argument('--badlimit', type=int, default=None,
+                    help='Set upper limit for number of bad channels to be removed')
 parser.add_argument('--trans', type=str, default=None,
                     help='Transforms the data to the head position in defined file')
+
+parser.add_argument('--origin', nargs='+',
+                    help='Set specific sphere origin')
+parser.add_argument('--frame', type=str, default=None,
+                    help='Set device/dead co-ordinate frame')
+parser.add_argument('--force', action='store_true',
+                    help='Ignore program warnings')
 
 parser.add_argument('--tsss', action='store_true',
                     help='Apply temporal extension of maxfilter')
@@ -327,7 +534,7 @@ infifs = [fif.strip('\n') for fif in infifs]
 
 good_fifs = [1 for ii in range(len(infifs))]
 for idx, fif in enumerate(infifs):
-    if os.path.isfile(fif) == False:
+    if os.path.isfile(fif) is False:
         good_fifs[idx] = 0
         print('File not found: {0}'.format(fif))
 
@@ -344,7 +551,7 @@ for idx, fif in enumerate(infifs):
 
     # --------------
     # Format input and output files and run some checks
-    print('Processing run {0}/{1} : {2}'.format(idx+1,len(infifs), fif))
+    print('Processing run {0}/{1} : {2}'.format(idx+1, len(infifs), fif))
 
     # Skip run if we couldn't find the input file on disk
     if good_fifs[idx] == 0:
@@ -372,5 +579,8 @@ for idx, fif in enumerate(infifs):
     elif args.mode == 'multistage':
         outbase = outfif[:-4] + '_{0}'
         run_multistage_maxfilter(infifs[idx], outbase, vars(args))
+    elif args.mode == 'cbu_3stage':
+        outbase = outfif[:-4] + '_{0}'
+        run_cbu_3stage_maxfilter(infifs[idx], outbase, vars(args))
 
 print('\nProcessing complete. OHBA-and-out.\n')
