@@ -1,0 +1,72 @@
+# OHBA Maxfilter
+
+A python batch processing script for Maxfilter preprocessing of MEG files.
+
+## Dependancies
+
+OHBA Maxfilter mostly runs using standard python libraries. MNE-Python is required to run the `cbu_3stage` mode.
+
+## Install
+
+`ohba_maxfilter.py` runs as a standalone script. Download or clone the script onto your computer and run as a command line function.
+
+## Usage
+
+`ohba_maxfilter.py` requires at least 2 positional inputs to run. These are
+
+```
+  files                 plain text file containing full paths to files to be
+                        processed
+  outdir                Path to output directory to save data in
+```
+
+For example:
+
+```
+python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/
+```
+
+will run each fif file in `input_files.txt` through maxfilter with default options and store the outputs in `/path/to/my/output/dir/`
+
+### Optional Arguments
+
+```
+optional arguments:
+  -h, --help            show this help message and exit
+  --maxpath MAXPATH     Path to maxfilter command to use
+  --mode MODE           Running mode for maxfilter. Either 'standard' or
+                        'multistage'
+  --headpos             Output additional head movement parameter file
+  --movecomp            Apply movement compensation
+  --movecompinter       Apply movement compensation on data with intermittent
+                        HPI
+  --autobad             Apply automatic bad channel detection
+  --autobad_dur AUTOBAD_DUR
+                        Set autobad on with a specific duration
+  --bad BAD [BAD ...]   Set specific channels to bad
+  --badlimit BADLIMIT   Set upper limit for number of bad channels to be
+                        removed
+  --trans TRANS         Transforms the data to the head position in defined
+                        file
+  --origin ORIGIN [ORIGIN ...]
+                        Set specific sphere origin
+  --frame FRAME         Set device/dead co-ordinate frame
+  --force               Ignore program warnings
+  --tsss                Apply temporal extension of maxfilter
+  --st ST               Data buffer length for TSSS processing
+  --corr CORR           Subspace correlation limit for TSSS processing
+  --inorder INORDER     Set the order of the inside expansion
+  --outorder OUTORDER   Set the order of the outside expansion
+  --hpie HPIE           sets the error limit for hpi coil fitting (def 5 mm)
+  --hpig HPIG           ets the g-value limit (goodness-of-fit) for hpi coil
+                        fitting (def 0.98))
+  --scanner SCANNER     Set CTC and Cal for the OHBA scanner the dataset was
+                        collected with (VectorView, VectorView2 or Neo). This
+                        overrides the --ctc and --cal options.
+  --ctc CTC             Specify cross-talk calibration file
+  --cal CAL             Specify fine-calibration file
+  --overwrite           Overwrite previous output files if they're in the way
+  --dryrun              Don't actually run anything, just print commands that
+                        would have been run
+```
+
