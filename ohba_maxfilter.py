@@ -579,7 +579,7 @@ for idx, fif in enumerate(infifs):
     elif args.mode == 'multistage':
         outbase = outfif[:-4] + '_{0}'
         run_multistage_maxfilter(infifs[idx], outbase, vars(args))
-    elif args.mode == 'cbu_3stage':
+    elif args.mode == 'cbu':
         outbase = outfif[:-4] + '_{0}'
         run_cbu_3stage_maxfilter(infifs[idx], outbase, vars(args))
 
