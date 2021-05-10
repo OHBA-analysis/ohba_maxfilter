@@ -253,10 +253,14 @@ def run_maxfilter(infif, outfif, args, logfile_tag=''):
         cmd = _add_cal(cmd, args)
 
     # Add verbose and logfile
+    if args['outdir'] == 'adjacent':
+        outdir = os.path.split(infif)[0]
+    else:
+        outdir = args['outdir']
     stdlog = outname.replace('.fif', '{0}.log'.format(logfile_tag))
-    stdlog = os.path.join(args['outdir'], stdlog)
+    stdlog = os.path.join(outdir, stdlog)
     errlog = outname.replace('.fif', '{0}_err.log'.format(logfile_tag))
-    errlog = os.path.join(args['outdir'], errlog)
+    errlog = os.path.join(outdir, errlog)
 
     # Set tee to capture both stdout and stderr into separate files
     # https://stackoverflow.com/a/692407
@@ -543,7 +547,12 @@ if args.trans is not None:
         sys.exit('Trans file not found ({0})'.format(args.trans))
 
 print('Processing {0} files'.format(sum(good_fifs)))
-print('Outputs saving to: {0}\n\n'.format(args.outdir))
+if args.outdir == 'adjacent':
+    print('Outputs will be saved alongside inputs\n\n')
+else:
+    if os.path.isdir(args.outdir) is False:
+        sys.exit('Output directory not found ({0})'.format(args.trans))
+    print('Outputs saving to: {0}\n\n'.format(args.outdir))
 
 # -------------------------------------------------
 
@@ -562,7 +571,10 @@ for idx, fif in enumerate(infifs):
     outname = os.path.split(fif)[1]
 
     # Outputfile is output dir + output name
-    outfif = os.path.join(args.outdir, outname)
+    if args.outdir == 'adjacent':
+        outfif = fif[:-4]
+    else:
+        outfif = os.path.join(args.outdir, outname)[:-4]
 
     # Skip run if the output exists and we don't want to overwrite
     if os.path.isfile(outfif) and (args.overwrite is False):
@@ -575,12 +587,14 @@ for idx, fif in enumerate(infifs):
         os.remove(outfif)
 
     if args.mode == 'standard':
+        flag = '_tsss' if args.tsss else '_sss'
+        outfif = outfif + '_.fif'
         outfif, outlog = run_maxfilter(infifs[idx], outfif, vars(args))
     elif args.mode == 'multistage':
-        outbase = outfif[:-4] + '_{0}'
+        outbase = outfif + '_{0}'
         run_multistage_maxfilter(infifs[idx], outbase, vars(args))
     elif args.mode == 'cbu':
-        outbase = outfif[:-4] + '_{0}'
+        outbase = outfif + '_{0}'
         run_cbu_3stage_maxfilter(infifs[idx], outbase, vars(args))
 
 print('\nProcessing complete. OHBA-and-out.\n')
