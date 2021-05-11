@@ -37,7 +37,7 @@ will run each fif file in `input_files.txt` through maxfilter with default optio
 
 ### Customising Options
 
-Maxfilter processing can be customised using command line flags which are (mostly) mapped to the options in Maxfilter itself. For exmaple, we can specify that `autobad` be included by adding the `--autobad` command line flag.
+Maxfilter processing can be customised using command line flags which are (mostly) mapped to the options in Maxfilter itself. For example, we can specify that `autobad` be included by adding the `--autobad` command line flag.
 
 ```
 python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --autobad
@@ -49,10 +49,10 @@ Similarly, we can include movement compensation and head-position computation by
 python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --autobad --movecomp --headpos
 ```
 
-Some options take additional arguments. Here we specify that temporal extension SSS should be applied with a 20 second data buffer (using `--tsss` and `-st 20`) and that two specific channels should be removed from the analysis (`--bads 1722 1723`).
+Some options take additional arguments. Here we specify that temporal extension SSS should be applied with a 20 second data buffer (using `--tsss` and `-st 20`) and that two specific channels should be removed from the analysis (`--bad 1722 1723`).
 
 ```
-python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --movecomp --headpos --tsss --st 20 --bads 1722 1723
+python ohba_maxfilter.py input_files.txt /path/to/my/output/dir/ --movecomp --headpos --tsss --st 20 --bad 1722 1723
 ```
 
 A [complete list of customisation options](#optional-arguments) is included at the bottom of this page.
