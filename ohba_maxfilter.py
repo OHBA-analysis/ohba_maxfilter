@@ -176,23 +176,38 @@ def _add_scanner(cmd, args):
     return cmd
 
 
+def quick_load_dig(fname):
+    import mne
+    from mne.io.constants import FIFF
+    ff, tree, _ = mne.io.open.fiff_open(fname, preload=False)
+    meas = mne.io.tree.dir_tree_find(tree, FIFF.FIFFB_MEAS)
+    meas_info = mne.io.tree.dir_tree_find(meas, FIFF.FIFFB_MEAS_INFO)
+    dig = mne.io._digitization._read_dig_fif(ff, meas_info)
+    return dig
+
+
 def fit_cbu_origin(infif, outbase=None, remove_nose=True):
     if 'mne' not in sys.modules:
         import mne
     if 'np' not in sys.modules:
         import numpy as np
-    raw = mne.io.read_raw_fif(infif)
+
+    try:
+        raw = mne.io.read_raw_fif(infif)
+        dig = raw.info['dig']
+    except ValueError:
+        dig = quick_load_dig(infif)
 
     # Extract headshape points
     headshape = []
-    for dp in raw.info['dig']:
+    for dp in dig:
         if dp['kind']._name.find('EXTRA') > 0:
             headshape.append(dp['r'])
     headshape = np.vstack(headshape)
 
     if remove_nose:
         # Remove nosepoints
-        keeps = np.where(np.logical_and(headshape[:, 2] < 0, headshape[:, 1] > 0) is False)[0]
+        keeps = np.where(np.logical_and(headshape[:, 2] < 0, headshape[:, 1] > 0) == False)[0]  # noqa: E712
         headshape = headshape[keeps, :]
 
     # Save txt and fit origin
@@ -208,9 +223,10 @@ def fit_cbu_origin(infif, outbase=None, remove_nose=True):
     cmd = '/neuro/bin/util/fit_sphere_to_points {0} > {1}'.format(tmp_hs, tmp_fit)
     os.system("bash -c '{}'".format(cmd))
 
-    new_origin = np.loadtxt(tmp_fit)
+    new_origin = np.loadtxt(tmp_fit)[:3] * 1000
+    print('Fitted origin is {0}'.format(new_origin))
 
-    return new_origin[:3] * 1000
+    return new_origin
 
 
 def run_maxfilter(infif, outfif, args, logfile_tag=''):
